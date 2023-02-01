@@ -39,7 +39,7 @@ class LogPreprocessor:
         self.variants = list(self.variants.keys())
         var = self.source_df.groupby(self.case_id_key)[self.activity_key].apply(list).reset_index()
         var[self.activity_key] = var[self.activity_key].apply(lambda x: ','.join(map(str, x)))
-        var = var.rename({"department":"variant"}, axis=1)
+        var = var.rename({self.activity_key:"variant"}, axis=1)
         df_with_variants = self.source_df.merge(var, how="left", on=self.case_id_key)
         var_count = df_with_variants.drop_duplicates(self.case_id_key).groupby('variant').count()
         to_drop = list(var_count.loc[var_count[self.case_id_key] < 20].reset_index()['variant'])

@@ -88,29 +88,29 @@ class ProcessChangeAnalyzer:
         diff_df = self.df_with_variants.set_index([self.case_id_column, self.activity_column])[self.categorical_columns].reset_index()
         shifted_df = diff_df.shift(periods = 1)
         joined_df = diff_df.join(shifted_df, rsuffix='_prev')
-        joined_df = joined_df[joined_df['department'] != 'Emergency Department']
+        joined_df = joined_df[joined_df[self.activity_column] != 'Emergency Department']
         # concat columns
         change_list = []
         for i, row in joined_df.iterrows():
             list_item = {
-                'hadm_id': row['hadm_id'],
-                'department_prev': row['department_prev'],
-                'department': row['department']
+                self.case_id_column: row[self.case_id_column],
+                'previous_activity': row[self.activity_column + '_prev'],
+                self.activity_column: row[self.activity_column]
             }
             for col in self.categorical_columns:
-                list_item[col + '_change'] = f"{row[col + '_prev']}-{row[col]}"
+                list_item[col] = f"{row[col + '_prev']}-{row[col]}"
             change_list.append(list_item)
         change_df = pd.DataFrame(change_list)
-        self.prepared_categorical_df = change_df.groupby(['department_prev','department']).agg(list)
+        self.prepared_categorical_df = change_df.groupby(['previous_activity', self.activity_column]).agg(list)
         return self.prepared_categorical_df
     
     def prepare_con_cat_correlation(self):
         con_grouped = self.continuous_grouped_df
         cat_grouped = self.prepared_categorical_df
-        con_grouped = con_grouped.reorder_levels(['previous_activity','department']).sort_index()
-        con_cat = con_grouped.merge(cat_grouped, left_index=True, right_on=["department_prev", "department"], how="left")
-        con_cat.drop("hadm_id_y", axis=1, inplace=True)
-        con_cat.rename(columns={"hadm_id_x":"hadm_id"}, inplace=True)
+        con_grouped = con_grouped.reorder_levels(['previous_activity', self.activity_column]).sort_index()
+        con_cat = con_grouped.merge(cat_grouped, left_index=True, right_on=["previous_activity", self.activity_column], how="left")
+        con_cat.drop(self.case_id_column + '_y', axis=1, inplace=True)
+        con_cat.rename(columns={self.case_id_column + '_x':self.case_id_column}, inplace=True)
         self.con_cat = con_cat
         return self.con_cat
 
@@ -173,10 +173,6 @@ class ProcessChangeAnalyzer:
         con_columns.remove("time:timestamp")
         con_columns.append("sum_timestamp")
         cat_columns = self.categorical_columns.copy()
-        for cat in cat_columns:
-            new_cat = cat + "_change"
-            cat_columns[cat_columns.index(cat)] = new_cat
-
         con_cat = self.con_cat
         anova = []
         kruskal = []
@@ -201,14 +197,14 @@ class ProcessChangeAnalyzer:
                                     con_unique_cat = np.array(temp_row[con])[[cat_usable_index]] 
                                     cat_dict[unique_cat] = con_unique_cat
                                 if len(cat_dict) > 1:
-                                    if self.is_measure_normal_distributed(temp_row['department_prev'], temp_row[self.activity_column], con):
+                                    if self.is_measure_normal_distributed(temp_row['previous_activity'], temp_row[self.activity_column], con):
                                         #perform ANOVA one way test
                                         anova_test = stats.f_oneway(*(cat_dict[v] for v in cat_dict))
-                                        anova.append([temp_row['department_prev'], temp_row[self.activity_column], con, cat, len(usable_indices), anova_test[0], anova_test[1]])
+                                        anova.append([temp_row['previous_activity'], temp_row[self.activity_column], con, cat, len(usable_indices), anova_test[0], anova_test[1]])
                                     else:
                                         #perform kruskal-wallis test        
                                         kruskal_test = stats.kruskal(*(cat_dict[v] for v in cat_dict))
-                                        kruskal.append([temp_row['department_prev'], temp_row[self.activity_column], con, cat, len(usable_indices), kruskal_test[0], kruskal_test[1]])
+                                        kruskal.append([temp_row['previous_activity'], temp_row[self.activity_column], con, cat, len(usable_indices), kruskal_test[0], kruskal_test[1]])
                     except Exception as e:
                             print(e)
         self.anova_df = pd.DataFrame(anova, columns = ['Act_1', 'Act_2', 'measure_1', 'measure_2', 'sample_size', 'stat', 'p'])
@@ -220,14 +216,11 @@ class ProcessChangeAnalyzer:
         con_columns.remove("time:timestamp")
         con_columns.append("sum_timestamp")
         cat_columns = self.categorical_columns.copy()
-        for cat in cat_columns:
-            new_cat = cat + "_change"
-            cat_columns[cat_columns.index(cat)] = new_cat
 
         con_cat = self.con_cat
         corr_arr = []
         for index, temp_row in con_cat.reset_index().iterrows():
-            act_3 = temp_row['department_prev']
+            act_3 = temp_row['previous_activity']
             act_4 = temp_row[self.activity_column]
             if act_3 == act_1 and act_4 == act_2:
                 pass
@@ -258,18 +251,12 @@ class ProcessChangeAnalyzer:
             first_ea_type = "con"
         else:
             first_ea_type = "cat"
-            #eA_1 = eA_1 + "_change"
 
 
         if eA_2 in con_columns:
             second_ea_type = "con"
         else:
             second_ea_type = "cat"
-            #eA_2 = eA_2 + "_change"
-        
-        for cat in cat_columns:
-            new_cat = cat + "_change"
-            cat_columns[cat_columns.index(cat)] = new_cat
         
         row_rel_1 = con_cat.loc[(act_1, act_2)]
         row_rel_2 = con_cat.loc[(act_3, act_4)]
@@ -432,7 +419,7 @@ class ProcessChangeAnalyzer:
             for i in range(len(temp_row.index)):
                 for j in range(i+1, len(temp_row.index)):
                     try:
-                        if temp_row.index[i] not in ['department_prev', 'department', 'hadm_id'] and temp_row.index[j] not in ['department_prev', 'department', 'hadm_id']:
+                        if temp_row.index[i] not in ['previous_activity', self.activity_column, self.case_id_column] and temp_row.index[j] not in ['previous_activity', self.activity_column, self.case_id_column]:
                             # remove measurements w/o values for this transition
                             if ~(np.array(temp_row[i]) == 'nan-nan').all() and ~(np.array(temp_row[j]) == 'nan-nan').all():
                                 usable_indices = np.intersect1d(
@@ -441,7 +428,7 @@ class ProcessChangeAnalyzer:
                                 )
                                 if len(usable_indices) >= 2:
                                     coef = self.cramer_v(np.array(temp_row[i])[[usable_indices]], np.array(temp_row[j])[[usable_indices]])
-                                    craemers_v.append([temp_row['department_prev'], temp_row['department'], temp_row.index[i], temp_row.index[j], len(usable_indices), coef, np.array(temp_row[i])[[usable_indices]][0], np.array(temp_row[j])[[usable_indices]][0]])
+                                    craemers_v.append([temp_row['previous_activity'], temp_row[self.activity_column], temp_row.index[i], temp_row.index[j], len(usable_indices), coef, np.array(temp_row[i])[[usable_indices]][0], np.array(temp_row[j])[[usable_indices]][0]])
                     except Exception as e:
                         #print(f"{temp_row['department_prev']} -> {temp_row['department']} for {temp_row.index[i]} to {temp_row.index[j]} with {coef[0][1]}")
                         print(e)
