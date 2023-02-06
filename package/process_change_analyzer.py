@@ -158,10 +158,10 @@ class ProcessChangeAnalyzer:
                                     # check whether or not both data pairs are normal distributed
                                     if self.is_measure_normal_distributed(temp_row['previous_activity'], temp_row[self.activity_column], temp_row.index[i]) and self.is_measure_normal_distributed(temp_row['previous_activity'], temp_row[self.activity_column], temp_row.index[j]):
                                         scipy_coef = scipy.stats.pearsonr(np.array(temp_row[i])[[usable_indices]], np.array(temp_row[j])[[usable_indices]])
-                                        pearson.append([temp_row['previous_activity'], temp_row[self.activity_column], temp_row.index[i], temp_row.index[j], len(usable_indices), scipy_coef[0], np.array(temp_row[i])[[usable_indices]][0], np.array(temp_row[j])[[usable_indices]][0]])        
+                                        pearson.append([temp_row['previous_activity'], temp_row[self.activity_column], temp_row.index[i], temp_row.index[j], len(usable_indices), scipy_coef[0], np.array(temp_row[i])[[usable_indices]], np.array(temp_row[j])[[usable_indices]]])        
                                     else:
                                         scipy_coef = scipy.stats.spearmanr(np.array(temp_row[i])[[usable_indices]], np.array(temp_row[j])[[usable_indices]])
-                                        spearman.append([temp_row['previous_activity'], temp_row[self.activity_column], temp_row.index[i], temp_row.index[j], len(usable_indices), scipy_coef[0], np.array(temp_row[i])[[usable_indices]][0], np.array(temp_row[j])[[usable_indices]][0]])
+                                        spearman.append([temp_row['previous_activity'], temp_row[self.activity_column], temp_row.index[i], temp_row.index[j], len(usable_indices), scipy_coef[0], np.array(temp_row[i])[[usable_indices]], np.array(temp_row[j])[[usable_indices]]])
                     except Exception as e:
                         print(e)
                                 
@@ -200,15 +200,15 @@ class ProcessChangeAnalyzer:
                                     if self.is_measure_normal_distributed(temp_row['previous_activity'], temp_row[self.activity_column], con):
                                         #perform ANOVA one way test
                                         anova_test = stats.f_oneway(*(cat_dict[v] for v in cat_dict))
-                                        anova.append([temp_row['previous_activity'], temp_row[self.activity_column], con, cat, len(usable_indices), anova_test[0], anova_test[1]])
+                                        anova.append([temp_row['previous_activity'], temp_row[self.activity_column], con, cat, len(usable_indices), anova_test[0], anova_test[1], cat_usable, np.array(temp_row[con])[[usable_indices]]])
                                     else:
                                         #perform kruskal-wallis test        
                                         kruskal_test = stats.kruskal(*(cat_dict[v] for v in cat_dict))
-                                        kruskal.append([temp_row['previous_activity'], temp_row[self.activity_column], con, cat, len(usable_indices), kruskal_test[0], kruskal_test[1]])
+                                        kruskal.append([temp_row['previous_activity'], temp_row[self.activity_column], con, cat, len(usable_indices), kruskal_test[0], kruskal_test[1], cat_usable, np.array(temp_row[con])[[usable_indices]]])
                     except Exception as e:
                             print(e)
-        self.anova_df = pd.DataFrame(anova, columns = ['Act_1', 'Act_2', 'measure_1', 'measure_2', 'sample_size', 'stat', 'p'])
-        self.kruskal_df = pd.DataFrame(kruskal, columns = ['Act_1', 'Act_2', 'measure_1', 'measure_2', 'sample_size', 'stat', 'p'])
+        self.anova_df = pd.DataFrame(anova, columns = ['Act_1', 'Act_2', 'measure_1', 'measure_2', 'sample_size', 'stat', 'p', 'values_1', 'values_2'])
+        self.kruskal_df = pd.DataFrame(kruskal, columns = ['Act_1', 'Act_2', 'measure_1', 'measure_2', 'sample_size', 'stat', 'p', 'values_1', 'values_2'])
         return self.anova_df, self.kruskal_df
     
     def compute_correlation_of_one_with_all_cells(self, act_1, act_2, measure, var_1):
@@ -227,9 +227,9 @@ class ProcessChangeAnalyzer:
             else:
                 for col in con_cat.columns:
                     if col != "hadm_id":
-                        corr, p, s, sample_size, method = self.compute_correlation_for_single_cell(act_1, act_2, act_3, act_4, measure, col, "", "")
-                        corr_arr.append([act_1, act_2, act_3, act_4, measure, col, sample_size, corr, p, s, method])
-        corr_df = pd.DataFrame(corr_arr, columns=['Act_1', 'Act_2', 'Act_3', 'Act_4',  'measure_1', 'measure_2', 'sample_size', 'scipy_corr', 'p', 'stat', 'method'])
+                        corr, p, s, sample_size, method, val_1, val_2 = self.compute_correlation_for_single_cell(act_1, act_2, act_3, act_4, measure, col, "", "")
+                        corr_arr.append([act_1, act_2, act_3, act_4, measure, col, sample_size, corr, p, s, method, val_1, val_2])
+        corr_df = pd.DataFrame(corr_arr, columns=['Act_1', 'Act_2', 'Act_3', 'Act_4',  'measure_1', 'measure_2', 'sample_size', 'scipy_corr', 'p', 'stat', 'method', 'values_1', 'values_2'])
         corr_df = corr_df.loc[corr_df["sample_size"] > 0].reset_index().drop("index", axis=1)
         return corr_df
                 
@@ -274,7 +274,7 @@ class ProcessChangeAnalyzer:
             return (0, 1, 0, 0, "")
         else:
             corr, p, s, method = self.calculate_correlation(first_ea_type, second_ea_type, usable_values_1, usable_values_2, usable_indices, act_1, act_2, act_3, act_4, eA_1, eA_2)
-        return corr, p, s, len(usable_indices), method
+        return corr, p, s, len(usable_indices), method, np.array(usable_values_1)[[usable_indices]], np.array(usable_values_2)[[usable_indices]]
 
     def calculate_correlation(self, first_ea_type, second_ea_type, usable_values_1, usable_values_2, usable_indices, act_1, act_2, act_3, act_4, eA_1, eA_2):
         p = 1
@@ -346,6 +346,28 @@ class ProcessChangeAnalyzer:
                 method = 'cramer'
         return corr, p, s, method
         
+    def compute_correlations_categorical(self):
+        # correlate all values for each row
+        craemers_v = []
+        for index, temp_row in self.prepared_categorical_df.reset_index().iterrows():
+            for i in range(len(temp_row.index)):
+                for j in range(i+1, len(temp_row.index)):
+                    try:
+                        if temp_row.index[i] not in ['previous_activity', self.activity_column, self.case_id_column] and temp_row.index[j] not in ['previous_activity', self.activity_column, self.case_id_column]:
+                            # remove measurements w/o values for this transition
+                            if ~(np.array(temp_row[i]) == 'nan-nan').all() and ~(np.array(temp_row[j]) == 'nan-nan').all():
+                                usable_indices = np.intersect1d(
+                                    np.flatnonzero(np.core.defchararray.find(temp_row[i],'nan')<0),                             
+                                    np.flatnonzero(np.core.defchararray.find(temp_row[j],'nan')<0)
+                                )
+                                if len(usable_indices) >= 2:
+                                    coef = self.cramer_v(np.array(temp_row[i])[[usable_indices]], np.array(temp_row[j])[[usable_indices]])
+                                    craemers_v.append([temp_row['previous_activity'], temp_row[self.activity_column], temp_row.index[i], temp_row.index[j], len(usable_indices), coef, np.array(temp_row[i])[[usable_indices]], np.array(temp_row[j])[[usable_indices]]])
+                    except Exception as e:
+                        #print(f"{temp_row['department_prev']} -> {temp_row['department']} for {temp_row.index[i]} to {temp_row.index[j]} with {coef[0][1]}")
+                        print(e)
+        self.cramer_df = pd.DataFrame(craemers_v, columns = ['Act_1', 'Act_2', 'measure_1', 'measure_2', 'sample_size', 'scipy_corr', 'values_1', 'values_2'])
+        return self.cramer_df
 
         
 
@@ -385,7 +407,7 @@ class ProcessChangeAnalyzer:
         self.anova_df['method'] = 'anova'
         self.kruskal_df['method'] = 'kruskal'
         self.correlation_df = pd.concat([self.pearson_df, self.spearman_df, self.cramer_df, self.anova_df, self.kruskal_df])
-        self.correlation_df = self.correlation_df[["Act_1", "Act_2", "measure_1", "measure_2", "sample_size", "scipy_corr", "p", "stat", "method"]]
+        self.correlation_df = self.correlation_df[["Act_1", "Act_2", "measure_1", "measure_2", "sample_size", "scipy_corr", "p", "stat", "method", "values_1", "values_2"]]
         self.continuous_correlation_df = pd.concat([self.pearson_df, self.spearman_df])
     
 
@@ -412,28 +434,7 @@ class ProcessChangeAnalyzer:
         print('y', val_1)
         print(count)
 
-    def compute_correlations_categorical(self):
-        # correlate all values for each row
-        craemers_v = []
-        for index, temp_row in self.prepared_categorical_df.reset_index().iterrows():
-            for i in range(len(temp_row.index)):
-                for j in range(i+1, len(temp_row.index)):
-                    try:
-                        if temp_row.index[i] not in ['previous_activity', self.activity_column, self.case_id_column] and temp_row.index[j] not in ['previous_activity', self.activity_column, self.case_id_column]:
-                            # remove measurements w/o values for this transition
-                            if ~(np.array(temp_row[i]) == 'nan-nan').all() and ~(np.array(temp_row[j]) == 'nan-nan').all():
-                                usable_indices = np.intersect1d(
-                                    np.flatnonzero(np.core.defchararray.find(temp_row[i],'nan')<0),                             
-                                    np.flatnonzero(np.core.defchararray.find(temp_row[j],'nan')<0)
-                                )
-                                if len(usable_indices) >= 2:
-                                    coef = self.cramer_v(np.array(temp_row[i])[[usable_indices]], np.array(temp_row[j])[[usable_indices]])
-                                    craemers_v.append([temp_row['previous_activity'], temp_row[self.activity_column], temp_row.index[i], temp_row.index[j], len(usable_indices), coef, np.array(temp_row[i])[[usable_indices]][0], np.array(temp_row[j])[[usable_indices]][0]])
-                    except Exception as e:
-                        #print(f"{temp_row['department_prev']} -> {temp_row['department']} for {temp_row.index[i]} to {temp_row.index[j]} with {coef[0][1]}")
-                        print(e)
-        self.cramer_df = pd.DataFrame(craemers_v, columns = ['Act_1', 'Act_2', 'measure_1', 'measure_2', 'sample_size', 'scipy_corr', 'values_1', 'values_2'])
-        return self.cramer_df
+
 
     def filter_correlation_by_measurements(self, measurements):
         return self.correlation_df[self.correlation_df['measure_1'].isin(measurements) & self.correlation_df['measure_2'].isin(measurements) & (self.correlation_df['measure_1'] != self.correlation_df['measure_2'])]
@@ -453,9 +454,9 @@ class ProcessChangeAnalyzer:
     def filter_strong_correlations(self,df=None):
         if df is None:
             df = self.correlation_df
-        significant_correlations = df[((df['scipy_corr'] > 0.6) | (df['scipy_corr'] < -0.6)) & (df['measure_1'] != df['measure_2']) & (df['sample_size'] > 10)]
+        significant_correlations = df[((df['scipy_corr'] > 0.6) | (df['scipy_corr'] < -0.6)  | ((df['p'] < 0.05) & (df["stat"] > 10)))  & (df['measure_1'] != df['measure_2']) & (df['sample_size'] > 50)]
         significant_correlations['abs_corr'] = np.abs(significant_correlations['scipy_corr'])
-        significant_correlations = significant_correlations.sort_values('abs_corr', ascending=False)
+        significant_correlations = significant_correlations.sort_values(['abs_corr', 'stat'], ascending=False)
         return significant_correlations
 
     def show_correlation_frequency_by_measurement_pair(self, df):
