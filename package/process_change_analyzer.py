@@ -480,7 +480,6 @@ class ProcessChangeAnalyzer:
         return self.clustered_df
 
     def edge_correlation_coefficient(self, edge, allowed_attributes):
-
         res = self.correlation_df.loc[
                 (self.correlation_df['Act_1'] == edge[0]) &  \
                 (self.correlation_df['Act_2'] == edge[1]) & \
