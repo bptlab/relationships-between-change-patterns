@@ -2,6 +2,7 @@ import pm4py
 from pm4py.objects.conversion.log import converter
 from pm4py.algo.filtering.log.variants import variants_filter
 from pm4py.algo.discovery.dfg import algorithm as dfg_discovery
+from pm4py.statistics.eventually_follows.log import get as efg_get
 from pm4py.visualization.dfg import visualizer as dfg_visualization
 import pandas as pd
 
@@ -22,6 +23,7 @@ class LogPreprocessor:
                                                 activity_key=self.activity_key, timestamp_key=self.timestamp_key)
         self.log = pm4py.convert_to_event_log(self.event_log)
         self.dfg = dfg_discovery.apply(self.log)
+        self.efg = efg_get.apply(self.log)
 
     def classify_attributes(proc_c):
         for index, row in proc_c.iterrows():

@@ -62,17 +62,21 @@ class ProcessChangeAnalyzer:
 
         self.preprocessor = LogPreprocessor(self.source_df, case_id_key=self.case_id_column, activity_key=self.activity_column, timestamp_key=self.time_column)
         self.df_with_variants = self.preprocessor.get_process_variants()
+        self.dfg = self.preprocessor.dfg
+        self.efg = self.preprocessor.efg
 
     def prepare_correlation(self):
         self.prepare_continuous_correlation()
         self.prepare_categorical_correlation()
         self.prepare_con_cat_correlation()
     
-    def prepare_continuous_correlation(self, first_trace_row_identifier = 'Emergency Department'):
+    def prepare_continuous_correlation(self):
+        #extra function for efg --> efg - dfg --> apply function --> store and make similar df to outcome of this function
         # for continuous columns
         continuous_diff_df = self.df_with_variants.set_index([self.case_id_column, self.activity_column])[self.continuous_columns].diff().reset_index()
         continuous_diff_df['previous_activity'] = continuous_diff_df[self.activity_column].shift(periods=1)
-        continuous_diff_df = continuous_diff_df[continuous_diff_df[self.activity_column] != first_trace_row_identifier]
+        continuous_diff_df = continuous_diff_df.groupby(self.case_id_column).apply(lambda group: group.iloc[1:])
+        #continuous_diff_df = continuous_diff_df[continuous_diff_df[self.activity_column] != first_trace_row_identifier]
 
         # add time perspective
         continuous_diff_df['duration'] = continuous_diff_df['time:timestamp'].dt.seconds
@@ -82,13 +86,39 @@ class ProcessChangeAnalyzer:
         self.continuous_diff_df = continuous_diff_df
         continuous_grouped_df = self.continuous_diff_df.groupby([self.activity_column, 'previous_activity']).agg(list)
         self.continuous_grouped_df = continuous_grouped_df
+        
+        #create efg df
+        efg_list = self.efg.copy()
+        for rel in self.dfg:
+            del(efg_list[rel]) 
+        #remove small sample size relations
+        l = list()
+        for x in efg_list:
+            if (efg_list[x] <= 30):
+                l.append(x)
+        for e in l:
+            del(efg_list[e])
+        for rel in efg_list:
+            act_1 = rel[0]
+            act_2 = rel[1]
+            df_efg = self.eventually_follow_hadms(self.df_with_variants, act_1, act_2)
+            df_efg = df_efg.set_index([self.case_id_column, self.activity_column])[self.continuous_columns].diff().reset_index()
+            df_efg['previous_activity'] = df_efg[self.activity_column].shift(periods=1)
+            df_efg = df_efg.groupby('case:hadm_id').apply(lambda group: group.iloc[1:])
+            #add time
+            df_efg['sum_timestamp'] = df_efg['time:timestamp'].dt.seconds
+            df_efg_grouped = df_efg.groupby([self.activity_column, 'previous_activity']).agg(list)
+            self.continuous_grouped_df = pd.concat([self.continuous_grouped_df, df_efg_grouped])
+
+        self.continuous_grouped_df = self.continuous_grouped_df.sort_index()
         return self.continuous_grouped_df
 
     def prepare_categorical_correlation(self):
         diff_df = self.df_with_variants.set_index([self.case_id_column, self.activity_column])[self.categorical_columns].reset_index()
         shifted_df = diff_df.shift(periods = 1)
         joined_df = diff_df.join(shifted_df, rsuffix='_prev')
-        joined_df = joined_df[joined_df[self.activity_column] != 'Emergency Department']
+        joined_df = joined_df.groupby(self.case_id_column).apply(lambda group: group.iloc[1:])
+        #joined_df = joined_df[joined_df[self.activity_column] != 'Emergency Department']
         # concat columns
         change_list = []
         for i, row in joined_df.iterrows():
@@ -102,6 +132,40 @@ class ProcessChangeAnalyzer:
             change_list.append(list_item)
         change_df = pd.DataFrame(change_list)
         self.prepared_categorical_df = change_df.groupby(['previous_activity', self.activity_column]).agg(list)
+
+        #create efg df
+        efg_list = self.efg.copy()
+        for rel in self.dfg:
+            del(efg_list[rel]) 
+        #remove small sample size relations
+        l = list()
+        for x in efg_list:
+            if (efg_list[x] <= 30):
+                l.append(x)
+        for e in l:
+            del(efg_list[e])
+        for rel in efg_list:
+            act_1 = rel[0]
+            act_2 = rel[1]
+            df_efg = self.eventually_follow_hadms(self.df_with_variants, act_1, act_2)
+            df_efg = df_efg.set_index([self.case_id_column, self.activity_column])[self.categorical_columns].reset_index()
+            shifted_df = df_efg.shift(periods = 1)
+            joined_df = df_efg.join(shifted_df, rsuffix='_prev')
+            joined_df = joined_df.groupby(self.case_id_column).apply(lambda group: group.iloc[1:])
+            change_list = []
+            for i, row in joined_df.iterrows():
+                list_item = {
+                    self.case_id_column: row[self.case_id_column],
+                    'previous_activity': row[self.activity_column + '_prev'],
+                    self.activity_column: row[self.activity_column]
+                }
+                for col in self.categorical_columns:
+                    list_item[col] = f"{row[col + '_prev']}-{row[col]}"
+                change_list.append(list_item)
+            change_df = pd.DataFrame(change_list)
+            cat_grouped = change_df.groupby(['previous_activity', self.activity_column]).agg(list)
+            self.prepared_categorical_df = pd.concat([self.prepared_categorical_df, cat_grouped])
+        self.prepared_categorical_df = self.prepared_categorical_df.sort_index()
         return self.prepared_categorical_df
     
     def prepare_con_cat_correlation(self):
@@ -166,7 +230,7 @@ class ProcessChangeAnalyzer:
                         print(e)
                                 
         self.pearson_df = pd.DataFrame(pearson, columns = ['Act_1', 'Act_2', 'measure_1', 'measure_2', 'sample_size', 'scipy_corr', 'values_1', 'values_2'])
-        self.spearman_df= pd.DataFrame(spearman, columns = ['Act_1', 'Act_2', 'measure_1', 'measure_2', 'sample_size', 'scipy_corr', 'values_1', 'values_2'])
+        self.spearman_df = pd.DataFrame(spearman, columns = ['Act_1', 'Act_2', 'measure_1', 'measure_2', 'sample_size', 'scipy_corr', 'values_1', 'values_2'])
         
     def compute_correlations_con_cat(self):
         con_columns = self.continuous_columns.copy()
@@ -216,7 +280,6 @@ class ProcessChangeAnalyzer:
         con_columns.remove("time:timestamp")
         con_columns.append("sum_timestamp")
         cat_columns = self.categorical_columns.copy()
-
         con_cat = self.con_cat
         corr_arr = []
         for index, temp_row in con_cat.reset_index().iterrows():
@@ -226,10 +289,10 @@ class ProcessChangeAnalyzer:
                 pass
             else:
                 for col in con_cat.columns:
-                    if col != "hadm_id":
-                        corr, p, s, sample_size, method, val_1, val_2 = self.compute_correlation_for_single_cell(act_1, act_2, act_3, act_4, measure, col, "", "")
-                        corr_arr.append([act_1, act_2, act_3, act_4, measure, col, sample_size, corr, p, s, method, val_1, val_2])
-        corr_df = pd.DataFrame(corr_arr, columns=['Act_1', 'Act_2', 'Act_3', 'Act_4',  'measure_1', 'measure_2', 'sample_size', 'scipy_corr', 'p', 'stat', 'method', 'values_1', 'values_2'])
+                    if col != self.case_id_column and col != self.time_column:
+                        corr, p, s, sample_size, method, method_2, val_1, val_2 = self.compute_correlation_for_single_cell(act_1, act_2, act_3, act_4, measure, col, "", "")
+                        corr_arr.append([act_1, act_2, act_3, act_4, measure, col, sample_size, corr, p, s, method, method_2, val_1, val_2])
+        corr_df = pd.DataFrame(corr_arr, columns=['Act_1', 'Act_2', 'Act_3', 'Act_4',  'measure_1', 'measure_2', 'sample_size', 'scipy_corr', 'p', 'stat', 'method', 'method_2', 'values_1', 'values_2'])
         corr_df = corr_df.loc[corr_df["sample_size"] > 0].reset_index().drop("index", axis=1)
         return corr_df
                 
@@ -260,6 +323,10 @@ class ProcessChangeAnalyzer:
         
         row_rel_1 = con_cat.loc[(act_1, act_2)]
         row_rel_2 = con_cat.loc[(act_3, act_4)]
+        if not isinstance(row_rel_1, pd.Series):
+            row_rel_1 = con_cat.loc[(act_1, act_2)].iloc[0]
+        if not isinstance(row_rel_2, pd.Series):  
+            row_rel_2 = con_cat.loc[(act_3, act_4)].iloc[0]
         usable_case_ids = np.intersect1d(row_rel_1[self.case_id_column], row_rel_2[self.case_id_column])
         usable_case_ids_1 = np.isin(row_rel_1[self.case_id_column], usable_case_ids)
         usable_case_ids_2 = np.isin(row_rel_2[self.case_id_column], usable_case_ids)
@@ -267,20 +334,24 @@ class ProcessChangeAnalyzer:
         usable_case_index_2 = np.where(usable_case_ids_2 == True)[0]
         usable_values_1 = np.array(row_rel_1[eA_1])[[usable_case_index_1]]
         usable_values_2 = np.array(row_rel_2[eA_2])[[usable_case_index_2]]
+
         #two functions - one for usable indices, one for statistical tests and cat preprocessing
-        usable_indices = self.retrieve_usable_indices(first_ea_type, second_ea_type, usable_values_1, usable_values_2)
-        if len(usable_indices) <= 2:
-            print("Intersection of usable values is less than 2. Cannot calculate correlation")
-            return (0, 1, 0, 0, "")
+        if len(usable_values_1) > 0 and len(usable_values_2) > 0:
+            usable_indices = self.retrieve_usable_indices(first_ea_type, second_ea_type, usable_values_1, usable_values_2)
         else:
-            corr, p, s, method = self.calculate_correlation(first_ea_type, second_ea_type, usable_values_1, usable_values_2, usable_indices, act_1, act_2, act_3, act_4, eA_1, eA_2)
-        return corr, p, s, len(usable_indices), method, np.array(usable_values_1)[[usable_indices]], np.array(usable_values_2)[[usable_indices]]
+            return (0, 1, 0, 0, "", "", 0, 0)
+        if len(usable_indices) <= 2:
+            return (0, 1, 0, 0, "", "", 0, 0)
+        else:
+            corr, p, s, method, method_2 = self.calculate_correlation(first_ea_type, second_ea_type, usable_values_1, usable_values_2, usable_indices, act_1, act_2, act_3, act_4, eA_1, eA_2)
+        return corr, p, s, len(usable_indices), method, method_2, np.array(usable_values_1)[[usable_indices]], np.array(usable_values_2)[[usable_indices]]
 
     def calculate_correlation(self, first_ea_type, second_ea_type, usable_values_1, usable_values_2, usable_indices, act_1, act_2, act_3, act_4, eA_1, eA_2):
         p = 1
         s = 0
         corr = 0
         method = ""
+        method_2 = ""
 
         if first_ea_type == "con" and second_ea_type == "con":
             if ~np.isnan(usable_values_1).all() and ~np.isnan(usable_values_2).all():
@@ -292,6 +363,11 @@ class ProcessChangeAnalyzer:
                     scipy_coef = scipy.stats.spearmanr(np.array(usable_values_1)[[usable_indices]], np.array(usable_values_2)[[usable_indices]])
                     corr = scipy_coef[0]
                     method = 'spearman'
+                if eA_1 == eA_2 and (act_1 != act_3 and act_2 != act_4):
+                    wilcoxon = pg.wilcoxon(np.array(usable_values_1)[[usable_indices]], np.array(usable_values_2)[[usable_indices]])
+                    method_2 = "wilcoxon"
+                    p = wilcoxon["p-val"][0]
+                    s = wilcoxon["RBC"][0]
         elif first_ea_type == "con" and second_ea_type == "cat":
             if ~np.isnan(usable_values_1).all() and ~(np.array(usable_values_2) == 'nan-nan').all():
                 cat_dict = {}
@@ -344,7 +420,7 @@ class ProcessChangeAnalyzer:
             if ~(np.array(usable_values_1) == 'nan-nan').all() and ~(np.array(usable_values_2) == 'nan-nan').all():
                 corr = self.cramer_v(np.array(usable_values_1)[[usable_indices]], np.array(usable_values_2)[[usable_indices]])
                 method = 'cramer'
-        return corr, p, s, method
+        return corr, p, s, method, method_2
         
     def compute_correlations_categorical(self):
         # correlate all values for each row
@@ -492,7 +568,26 @@ class ProcessChangeAnalyzer:
         else:
             return 0
 
-
+    def eventually_follow_hadms(self, df, act_1, act_2):
+        df = df.loc[df[self.activity_column].isin([act_1, act_2])]
+        l = [] 
+        hadms = df[self.case_id_column].unique()
+        rows_list = []
+        for hadm_id in hadms:
+            curr_act = ""
+            first_row = ""
+            df_hadm = df.loc[df[self.case_id_column] == hadm_id]
+            for index, row in df_hadm.iterrows():
+            #first act
+                if((row[self.activity_column] == act_1) & (curr_act == "")):
+                    curr_act = row[self.activity_column]
+                    first_row = row
+                elif((curr_act != "") & (row[self.activity_column] == act_2)):
+                    rows_list.append(first_row)
+                    rows_list.append(row)
+                    curr_act = ""
+                    
+        return pd.DataFrame(rows_list)
 
     def visualize(self, attributes):
         edges_correlation = copy(self.preprocessor.dfg)
