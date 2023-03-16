@@ -6,26 +6,26 @@ import seaborn as sns
 
 def plot_cell_correlation(row):
     figsize_value = (4,3.75)
-    fontsize_value = 5
+    fontsize_value = 10
     if row["method"] == "pearson" or row["method"] == "spearman":
         plt.close(2)
         fig, ax = plt.subplots(figsize=figsize_value, num='Correlation Plot')
-        plt.title(f"Relation: {row['Act_1']} -> {row['Act_2']} Correlation Coefficient: {row['scipy_corr'].round(2)}", fontsize=fontsize_value)
-        plt.xlabel(f"{row['measure_1']}  change", fontsize=fontsize_value)
-        plt.ylabel(f"{row['measure_2']}  change", fontsize=fontsize_value)
+        plt.title(f"{row['Act_1']} -> \n {row['Act_2']}: {row['scipy_corr'].round(2)}", fontsize=fontsize_value)
+        plt.xlabel(f"Δ{row['measure_1']}", fontsize=fontsize_value)
+        plt.ylabel(f"Δ{row['measure_2']}", fontsize=fontsize_value)
         plt.xticks(size=5, wrap=True)
         plt.yticks(size=5)
         plt.scatter(row['values_1'], row['values_2'])   
     elif row["method"] == "cramer":
         plt.close(2)
-        pd.crosstab(index=row['values_1'],columns=row['values_2']).plot(kind="bar", figsize=figsize_value, num='Correlation Plot')
-        legend = plt.legend(title=f"{row['measure_2']}  change", prop={'size': 6}, title_fontsize=6)
+        pd.crosstab(index=row['values_1'],columns=row['values_2']).plot(kind="bar", figsize=figsize_value, )
+        legend = plt.legend(title=f"Δ{row['measure_2']} ", prop={'size': 6}, title_fontsize=6)
         l_texts = [item for item in legend.get_texts()]
         for l_text in l_texts:
             l_text.set_text(l_text.get_text().replace('abnormal ', ''))
-        plt.title(f"Relation: {row['Act_1']} -> {row['Act_2']} Correlation Coefficient: {row['scipy_corr'].round(2)}", fontsize=fontsize_value)
-        plt.xlabel(f"{row['measure_1']}  change", fontsize=fontsize_value)
-        plt.ylabel(f"{row['measure_2']}  change", fontsize=fontsize_value)
+        plt.title(f"{row['Act_1']} -> {row['Act_2']}: {row['scipy_corr'].round(2)}", fontsize=fontsize_value)
+        plt.xlabel(f"Δ{row['measure_1']}", fontsize=fontsize_value)
+        plt.ylabel(f"Δ{row['measure_2']}", fontsize=fontsize_value)
         ax = plt.gca()
         plt.xticks(size=5, wrap=True)
         plt.yticks(size=5)
@@ -37,9 +37,9 @@ def plot_cell_correlation(row):
         plt.close(2)
         fig, ax = plt.subplots(figsize=figsize_value, num='Correlation Plot')
         sns.swarmplot(x='values_1', y='values_2', data=row, dodge=True, palette='viridis')
-        plt.title(f"Relation: {row['Act_1']} -> {row['Act_2']} Correlation Coefficient: {row['stat'].round(2)}", fontsize=fontsize_value)
-        plt.xlabel(f"{row['measure_2']}  change", fontsize=fontsize_value)
-        plt.ylabel(f"{row['measure_1']}  change", fontsize=fontsize_value)  
+        plt.title(f"{row['Act_1']} -> {row['Act_2']}: {row['stat'].round(2)}", fontsize=fontsize_value)
+        plt.xlabel(f"Δ{row['measure_2']}", fontsize=fontsize_value)
+        plt.ylabel(f"Δ{row['measure_1']}", fontsize=fontsize_value)  
         plt.xticks(size=5, wrap=True)
         plt.yticks(size=5)  
         #draw mean(avg) line
