@@ -17,5 +17,11 @@ After the event logs have been extracted, change patterns and their relationship
 
 When the change patterns have been detected, exectute the [last](https://github.com/bptlab/relationships-between-change-patterns/blob/main/3_UI.ipynb) jupyter notebook. It performs the relationship identification and visualizes the results in an UI.
 
+The figure below illustrates the developed tool for the approach presented in the paper. On top, the change pattern matrix can be configured, such that only the desired relations, attributes, and trace variants are presented. In the middle, the change pattern matrix is visualized, showing change analysis cells. If a significant chage pattenr was detects, the cell is coloured according to a value increase (red) or decrease (blue) with its respective RBC value. Clicking on one cell highlights the respective cell, which is the second cell from the left in the last row in Fig. 1.
+
+![alt text](https://github.com/bptlab/relationships-between-change-patterns/blob/main/Tool.PNG)
+|:--:| 
+| *Fig. 1 Tool demonstration* |
+
 
 [1] Cremerius, J., Weske, M.: Change detection in dynamic event attributes. In: Di Ciccio, C., Dijkman, R., del R ́ıo Ortega, A., Rinderle-Ma, S. (eds.) Business Process Management Forum. pp. 157–172. Springer International Publishing, Cham (2022)
