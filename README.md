@@ -15,7 +15,7 @@ The hospital department event log can be extracted, as described in [this reposi
 
 After the event logs have been extracted, change patterns and their relationships can be detected. The implementation is not limited to the above-mentioned event logs and can be used with all event logs. It should be noted, that the event logs should include dynamic event attributes to retrieve any results. It is only required, that the event logs are provided as a .csv file and that the mandatory attributes case id, activity, and timestamp are renamed in the [second jupyter notebook](https://github.com/bptlab/relationships-between-change-patterns/blob/main/2_Applying_Change_Detection.ipynb) accordingly. 
 
-When the change patterns have been detected, exectute the [last](https://github.com/bptlab/relationships-between-change-patterns/blob/main/3_UI.ipynb) jupyter notebook. The UI is integrated there and is ready to use.
+When the change patterns have been detected, exectute the [last](https://github.com/bptlab/relationships-between-change-patterns/blob/main/3_UI.ipynb) jupyter notebook. It performs the relationship identification and visualizes the results in an UI.
 
 
 [1] Cremerius, J., Weske, M.: Change detection in dynamic event attributes. In: Di Ciccio, C., Dijkman, R., del R ́ıo Ortega, A., Rinderle-Ma, S. (eds.) Business Process Management Forum. pp. 157–172. Springer International Publishing, Cham (2022)
