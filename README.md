@@ -1,7 +1,7 @@
 # Relationships between Change Patterns in Dynamic Event Attributes
 
 ## Introduction
-This repository provides the implementation and setup for the evaluation of the paper entitled <b>Relationships between Change Patterns in Dynamic Event Attributes</b>. This repository includes three jupyter notebooks. The first incorporates the event log generation of the ICU related event log. The second applies the change pattern detection, as introduced in [1]. The third identifies the relationships and illustrates the results in a UI. For the relationship identification, we provide a python [package](https://github.com/bptlab/relationships-between-change-patterns/tree/main/package). The results in the paper refer only to the Departments event log.
+This repository provides the implementation and setup for the evaluation of the paper entitled <b>Relationships between Change Patterns in Dynamic Event Attributes</b>. This repository includes three jupyter notebooks. The first incorporates the event log generation of the ICU related event log. The second applies the change pattern detection, as introduced in [1]. The third identifies the relationships and illustrates the results in a UI. For the relationship identification, we provide a python [package](https://github.com/bptlab/relationships-between-change-patterns/tree/main/package).
 
 ## Event Logs (Departments and ICU) 
 
